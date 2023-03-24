@@ -12,7 +12,7 @@ const Recommendation = ({ tags }) => {
 
   useEffect(() => {
     const fetchVideos = async () => {
-      const res = await axios.get(`/videos/tags?tags=${tags}`);
+      const res = await axios.get(`https://subrotubeapi.onrender.com/api/videos/random`);
       setVideos(res.data);
     };
     fetchVideos();
