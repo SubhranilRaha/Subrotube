@@ -1,20 +1,19 @@
-import React, { useEffect, useState } from "react";
-import styled from "styled-components";
-import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
-import ThumbDownOffAltOutlinedIcon from "@mui/icons-material/ThumbDownOffAltOutlined";
-import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import AddTaskOutlinedIcon from "@mui/icons-material/AddTaskOutlined";
+import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import ThumbDownIcon from "@mui/icons-material/ThumbDown";
+import ThumbDownOffAltOutlinedIcon from "@mui/icons-material/ThumbDownOffAltOutlined";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
-import Comments from "../components/Comments";
-import Card from "../components/Card";
+import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
+import axios from "axios";
+import React, { Suspense, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
-import axios from "axios";
-import { dislike, fetchSuccess, like } from "../redux/videoSlice";
+import styled from "styled-components";
 import { format } from "timeago.js";
-import { subscription } from "../redux/userSlice";
+import Comments from "../components/Comments";
 import Recommendation from "../components/Recommendation";
+import { subscription } from "../redux/userSlice";
+import { dislike, fetchStart, fetchSuccess, like } from "../redux/videoSlice";
 
 const Container = styled.div`
   display: flex;
@@ -116,9 +115,16 @@ const VideoFrame = styled.video`
   object-fit: cover;
 `;
 
+const Loading = styled.div`
+  color: white;
+`;
+
 const Video = () => {
   const { currentUser } = useSelector((state) => state.user);
   const { currentVideo } = useSelector((state) => state.video);
+  const vidloading = useSelector((state) => state.video.loading);
+  const userloading = useSelector((state) => state.user.loading);
+
   const dispatch = useDispatch();
 
   const path = useLocation().pathname.split("/")[2];
@@ -128,96 +134,166 @@ const Video = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const videoRes = await axios.get(`https://subrotubeapi.onrender.com/api/videos/find/${path}`);
+        dispatch(fetchStart());
+
+        const videoRes = await axios.get(
+          `https://subrotubeapi.onrender.com/api/videos/find/${path}`
+        );
         const channelRes = await axios.get(
           `https://subrotubeapi.onrender.com/api/users/find/${videoRes.data.userId}`
         );
         setChannel(channelRes.data);
-        console.log(channelRes.data)
+
         dispatch(fetchSuccess(videoRes.data));
       } catch (err) {}
     };
     fetchData();
+
   }, [path, dispatch]);
 
   const handleLike = async () => {
-    await axios.put(`https://subrotubeapi.onrender.com/api/users/like/${currentVideo._id}`);
+    try {
+      await axios.put(
+        `https://subrotubeapi.onrender.com/api/users/like/${currentVideo._id}`
+      );
+    } catch (error) {
+      console.log(error.response.data)
+    }
     dispatch(like(currentUser._id));
   };
   const handleDislike = async () => {
-    await axios.put(`https://subrotubeapi.onrender.com/api/users/dislike/${currentVideo._id}`);
+    await axios.put(
+      `https://subrotubeapi.onrender.com/api/users/dislike/${currentVideo._id}`
+    );
     dispatch(dislike(currentUser._id));
   };
 
   const handleSub = async () => {
     currentUser.subscribedUsers.includes(channel._id)
-      ? await axios.put(`https://subrotubeapi.onrender.com/api/users/unsub/${channel._id}`)
-      : await axios.put(`https://subrotubeapi.onrender.com/api/users/sub/${channel._id}`);
+      ? await axios.put(
+          `https://subrotubeapi.onrender.com/api/users/unsub/${channel._id}`
+        )
+      : await axios.put(
+          `https://subrotubeapi.onrender.com/api/users/sub/${channel._id}`
+        );
     dispatch(subscription(channel._id));
   };
 
   //TODO: DELETE VIDEO FUNCTIONALITY
+  // if(userloading){
+  //   return(
+  //     <Loading>Sign in to watch videos and perform actions like subscribe and like</Loading>
+  //   )
+  // }
+  // else
+  if (vidloading) {
+    return <Loading>loading...</Loading>;
+  } else {
+   
+    return (
+      <>
+        {currentUser == null ? (<>
+          <Container>
+              <Content>
+                <VideoWrapper>
+                  <VideoFrame src={currentVideo?.videoUrl} controls />
+                </VideoWrapper>
 
+                <Title>{currentVideo?.title}</Title>
+                <Details>
+                  <Info>
+                    {currentVideo?.views} views •{" "}
+                    {format(currentVideo?.createdAt)}
+                  </Info>
+                  <Buttons>
+                    <Button >
+                      Log In to Like and DisLike
+                    </Button>
+            
+                  </Buttons>
+                </Details>
+                <Hr />
+                <Channel>
+                  <ChannelInfo>
+                    <Image src={channel.img} />
+                    <ChannelDetail>
+                      <ChannelName>{channel.name}</ChannelName>
+                      <ChannelCounter>
+                        {channel.subscribers} subscribers
+                      </ChannelCounter>
+                      <Description>{currentVideo?.desc}</Description>
+                    </ChannelDetail>
+                  </ChannelInfo>
+                  <Subscribe >
+                    LogIn to Sub
+                  </Subscribe>
+                </Channel>
+                <Hr />
+                {/* <Comments videoId={currentVideo._id} /> */}
+              </Content>
+              <Recommendation tags={currentVideo?.tags} />
+            </Container>
+          </>
+        ) : (
+         
+            <Container>
+              <Content>
+                <VideoWrapper>
+                  <VideoFrame src={currentVideo?.videoUrl} controls />
+                </VideoWrapper>
 
-
-  return (
-    <Container>
-      <Content>
-        <VideoWrapper>
-          <VideoFrame src={currentVideo.videoUrl} controls />
-        </VideoWrapper>
-        <Title>{currentVideo.title}</Title>
-        <Details>
-          <Info>
-            {currentVideo.views} views • {format(currentVideo.createdAt)}
-          </Info>
-          <Buttons>
-            <Button onClick={handleLike}>
-              {currentVideo.likes?.includes(currentUser?._id) ? (
-                <ThumbUpIcon />
-              ) : (
-                <ThumbUpOutlinedIcon />
-              )}{" "}
-              {currentVideo.likes?.length}
-            </Button>
-            <Button onClick={handleDislike}>
-              {currentVideo.dislikes?.includes(currentUser?._id) ? (
-                <ThumbDownIcon />
-              ) : (
-                <ThumbDownOffAltOutlinedIcon />
-              )}{" "}
-              Dislike
-            </Button>
-            <Button>
-              <ReplyOutlinedIcon /> Share
-            </Button>
-            <Button>
-              <AddTaskOutlinedIcon /> Save
-            </Button>
-          </Buttons>
-        </Details>
-        <Hr />
-        <Channel>
-          <ChannelInfo>
-            <Image src={channel.img} />
-            <ChannelDetail>
-              <ChannelName>{channel.name}</ChannelName>
-              <ChannelCounter>{channel.subscribers} subscribers</ChannelCounter>
-              <Description>{currentVideo.desc}</Description>
-            </ChannelDetail>
-          </ChannelInfo>
-          <Subscribe onClick={handleSub}>
-            {currentUser.subscribedUsers?.includes(channel._id)
-              ? "SUBSCRIBED"
-              : "SUBSCRIBE"}
-          </Subscribe>
-        </Channel>
-        <Hr />
-        <Comments videoId={currentVideo._id} />
-      </Content>
-      <Recommendation tags={currentVideo.tags} />
-    </Container>
-  );
+                <Title>{currentVideo?.title}</Title>
+                <Details>
+                  <Info>
+                    {currentVideo?.views} views •{" "}
+                    {format(currentVideo?.createdAt)}
+                  </Info>
+                  <Buttons>
+                    <Button onClick={handleLike}>
+                      {currentVideo?.likes?.includes(currentUser?._id) ? (
+                        <ThumbUpIcon />
+                      ) : (
+                        <ThumbUpOutlinedIcon />
+                      )}{" "}
+                      {currentVideo?.likes?.length}
+                    </Button>
+                    <Button onClick={handleDislike}>
+                      {currentVideo?.dislikes?.includes(currentUser?._id) ? (
+                        <ThumbDownIcon />
+                      ) : (
+                        <ThumbDownOffAltOutlinedIcon />
+                      )}{" "}
+                      Dislike
+                    </Button>
+                  </Buttons>
+                </Details>
+                <Hr />
+                <Channel>
+                  <ChannelInfo>
+                    <Image src={channel.img} />
+                    <ChannelDetail>
+                      <ChannelName>{channel.name}</ChannelName>
+                      <ChannelCounter>
+                        {channel.subscribers} subscribers
+                      </ChannelCounter>
+                      <Description>{currentVideo?.desc}</Description>
+                    </ChannelDetail>
+                  </ChannelInfo>
+                  <Subscribe onClick={handleSub}>
+                    {currentUser.subscribedUsers?.includes(channel._id)
+                      ? "SUBSCRIBED"
+                      : "SUBSCRIBE"}
+                  </Subscribe>
+                </Channel>
+                <Hr />
+                <Comments videoId={currentVideo?._id} />
+              </Content>
+              <Recommendation tags={currentVideo?.tags} />
+            </Container>
+        )}
+      </>
+    );
+  }
 };
 
 export default Video;
